@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start frontend server
+        run: npm run start
+
+      - name: Wait for frontend server to start
+        run: sleep 5
+
+      - name: Check frontend status
+        run: |
+          output=$(curl -s http://localhost:8080 | grep "Lightdash - Explore and visualize your team's analytics and metrics." | wc -l)
+          if [[ $output -eq 1 ]]; then
+            echo "Frontend is running"
+          else
+            echo "Frontend is not running"
+            exit 1
+          fi
