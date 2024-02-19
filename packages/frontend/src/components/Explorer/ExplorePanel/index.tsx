@@ -1,10 +1,10 @@
+import { fieldId as getFieldId, getVisibleFields } from '@lightdash/common';
 import { Skeleton, Stack } from '@mantine/core';
-import { FC, memo } from 'react';
+import { FC, memo, useMemo } from 'react';
 import { useExplore } from '../../../hooks/useExplore';
 import { useExplorerContext } from '../../../providers/ExplorerProvider';
 import PageBreadcrumbs from '../../common/PageBreadcrumbs';
 import ExploreTree from '../ExploreTree';
-
 const LoadingSkeleton = () => (
     <Stack>
         <Skeleton h="md" />
@@ -31,9 +31,15 @@ const ExplorePanel: FC<ExplorePanelProps> = memo(({ onBack }) => {
         (context) =>
             context.state.unsavedChartVersion.metricQuery.additionalMetrics,
     );
+    const dimensions = useExplorerContext(
+        (context) => context.state.unsavedChartVersion.metricQuery.dimensions,
+    );
     const customDimensions = useExplorerContext(
         (context) =>
             context.state.unsavedChartVersion.metricQuery.customDimensions,
+    );
+    const metrics = useExplorerContext(
+        (context) => context.state.unsavedChartVersion.metricQuery.metrics,
     );
     const activeFields = useExplorerContext(
         (context) => context.state.activeFields,
@@ -42,6 +48,18 @@ const ExplorePanel: FC<ExplorePanelProps> = memo(({ onBack }) => {
         (context) => context.actions.toggleActiveField,
     );
     const { data, status } = useExplore(activeTableName);
+
+    const missingFields = useMemo(() => {
+        if (data) {
+            const visibleFields = getVisibleFields(data);
+            const allFields = [...visibleFields, ...(additionalMetrics || [])];
+
+            const selectedFields = [...metrics, ...dimensions];
+
+            const fieldIds = allFields.map(getFieldId);
+            return selectedFields.filter((node) => !fieldIds.includes(node));
+        }
+    }, [data, additionalMetrics, metrics, dimensions]);
 
     if (status === 'loading') {
         return <LoadingSkeleton />;
@@ -86,6 +104,8 @@ const ExplorePanel: FC<ExplorePanelProps> = memo(({ onBack }) => {
                 selectedNodes={activeFields}
                 onSelectedFieldChange={toggleActiveField}
                 customDimensions={customDimensions}
+                selectedDimensions={dimensions}
+                missingFields={missingFields}
             />
         </>
     );

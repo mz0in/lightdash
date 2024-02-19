@@ -1,4 +1,11 @@
 import {
+    DragDropContext,
+    Draggable,
+    DraggableProvidedDragHandleProps,
+    Droppable,
+    DropResult,
+} from '@hello-pangea/dnd';
+import {
     PieChartValueLabel,
     PieChartValueLabels,
     PieChartValueOptions,
@@ -22,13 +29,7 @@ import {
     IconGripVertical,
 } from '@tabler/icons-react';
 import { FC, forwardRef, useCallback } from 'react';
-import {
-    DragDropContext,
-    Draggable,
-    DraggableProvidedDragHandleProps,
-    Droppable,
-    DropResult,
-} from 'react-beautiful-dnd';
+import { useChartColorConfig } from '../../../hooks/useChartColorConfig';
 import MantineIcon from '../../common/MantineIcon';
 import { isPieVisualizationConfig } from '../../LightdashVisualization/VisualizationConfigPie';
 import { useVisualizationContext } from '../../LightdashVisualization/VisualizationProvider';
@@ -121,7 +122,7 @@ const ValueOptions: FC<ValueOptionsProps> = ({
 type GroupItemProps = {
     isOnlyItem: boolean;
 
-    dragHandleProps?: DraggableProvidedDragHandleProps;
+    dragHandleProps?: DraggableProvidedDragHandleProps | null;
 
     defaultColor: string;
     defaultLabel: string;
@@ -247,7 +248,9 @@ const GroupItem = forwardRef<HTMLDivElement, StackProps & GroupItemProps>(
 );
 
 const PieChartSeriesConfig: FC = () => {
-    const { visualizationConfig, colorPalette } = useVisualizationContext();
+    const { visualizationConfig, colorPalette, getGroupColor } =
+        useVisualizationContext();
+    const { useSharedColors } = useChartColorConfig({ colorPalette });
 
     const isPieChartConfig = isPieVisualizationConfig(visualizationConfig);
 
@@ -366,9 +369,17 @@ const PieChartSeriesConfig: FC = () => {
                                                 }
                                                 defaultLabel={groupLabel}
                                                 color={
+                                                    // Temporary until shared colors flag is removed - allows
+                                                    // falling back into the previous behavior:
                                                     groupColorOverrides[
                                                         groupLabel
-                                                    ]
+                                                    ] ??
+                                                    (useSharedColors
+                                                        ? getGroupColor(
+                                                              groupLabel,
+                                                          )
+                                                        : // Will fall back to defaults:
+                                                          undefined)
                                                 }
                                                 label={
                                                     groupLabelOverrides[

@@ -128,14 +128,15 @@ export const lightdashConfigMock: LightdashConfig = {
     groups: {
         enabled: false,
     },
+    extendedUsageAnalytics: {
+        enabled: false,
+    },
 };
 
 const dbtCloudIDEProjectConfigMock: DbtCloudIDEProjectConfig = {
     type: DbtProjectType.DBT_CLOUD_IDE,
     api_key: 'my api key',
-    account_id: 'account_id',
     environment_id: 'environment_id',
-    project_id: 'project_id',
 };
 
 const bigqueryCredentials: CreateBigqueryCredentials = {
@@ -195,9 +196,7 @@ export const expectedProject: Project = {
     name: 'my project',
     type: ProjectType.DEFAULT,
     dbtConnection: {
-        account_id: 'account_id',
         environment_id: 'environment_id',
-        project_id: 'project_id',
         type: DbtProjectType.DBT_CLOUD_IDE,
     } as any as DbtCloudIDEProjectConfig,
     warehouseConnection: {

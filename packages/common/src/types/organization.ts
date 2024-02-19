@@ -1,6 +1,6 @@
 import { OrganizationMemberRole } from './organizationMemberProfile';
 import { ProjectMemberRole } from './projectMemberRole';
-import { ProjectType } from './projects';
+import { ProjectType, WarehouseTypes } from './projects';
 
 /**
  * Details of a user's Organization
@@ -52,6 +52,8 @@ export type OrganizationProject = {
     projectUuid: string;
     name: string;
     type: ProjectType;
+    warehouseType: WarehouseTypes;
+    requireUserCredentials: boolean;
 };
 
 /**
@@ -108,9 +110,9 @@ export const AllowedEmailDomainProjectRoles: Array<AllowedEmailDomainProjectsRol
     ];
 
 export function isAllowedEmailDomainProjectRole(
-    role: ProjectMemberRole,
+    role: ProjectMemberRole | OrganizationMemberRole,
 ): role is AllowedEmailDomainProjectsRole {
-    return AllowedEmailDomainProjectRoles.includes(role as any);
+    return (AllowedEmailDomainProjectRoles as unknown[]).includes(role);
 }
 
 export type AllowedEmailDomains = {

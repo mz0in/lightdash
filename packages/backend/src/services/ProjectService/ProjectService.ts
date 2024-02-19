@@ -11,6 +11,7 @@ import {
     CalculateTotalFromQuery,
     ChartSummary,
     CompiledDimension,
+    convertCustomMetricToDbt,
     countCustomDimensionsInMetricQuery,
     countTotalFilterRules,
     CreateDbtCloudIntegration,
@@ -19,6 +20,7 @@ import {
     CreateProject,
     CreateProjectMember,
     CreateWarehouseCredentials,
+    CustomFormatType,
     DashboardAvailableFilters,
     DashboardBasicDetails,
     DashboardFilters,
@@ -31,6 +33,7 @@ import {
     DimensionType,
     Explore,
     ExploreError,
+    FeatureFlags,
     fieldId as getFieldId,
     FilterableField,
     FilterGroupItem,
@@ -77,13 +80,13 @@ import {
     SpaceQuery,
     SpaceSummary,
     SummaryExplore,
-    TableCalculationFormatType,
     TablesConfiguration,
     TableSelectionType,
     UnexpectedServerError,
     UpdateProject,
     UpdateProjectMember,
     UserAttributeValueMap,
+    UserWarehouseCredentials,
     WarehouseClient,
     WarehouseTypes,
 } from '@lightdash/common';
@@ -91,6 +94,7 @@ import { SshTunnel } from '@lightdash/warehouses';
 import opentelemetry, { SpanStatusCode } from '@opentelemetry/api';
 import * as Sentry from '@sentry/node';
 import * as crypto from 'crypto';
+import * as yaml from 'js-yaml';
 import { uniq } from 'lodash';
 import { URL } from 'url';
 import { v4 as uuidv4 } from 'uuid';
@@ -113,7 +117,7 @@ import { SpaceModel } from '../../models/SpaceModel';
 import { SshKeyPairModel } from '../../models/SshKeyPairModel';
 import { UserAttributesModel } from '../../models/UserAttributesModel';
 import { UserWarehouseCredentialsModel } from '../../models/UserWarehouseCredentials/UserWarehouseCredentialsModel';
-import { postHogClient } from '../../postHog';
+import { isFeatureFlagEnabled, postHogClient } from '../../postHog';
 import { projectAdapterFromConfig } from '../../projectAdapters/projectAdapter';
 import { buildQuery, CompiledQuery } from '../../queryBuilder';
 import { compileMetricQuery } from '../../queryCompiler';
@@ -240,7 +244,8 @@ export class ProjectService {
             );
         if (credentials.requireUserCredentials) {
             const userWarehouseCredentials =
-                await this.userWarehouseCredentialsModel.findForProject(
+                await this.userWarehouseCredentialsModel.findForProjectWithSecrets(
+                    projectUuid,
                     userUuid,
                     credentials.type,
                 );
@@ -248,10 +253,12 @@ export class ProjectService {
                 throw new NotFoundError('User warehouse credentials not found');
             }
 
-            if (credentials.type === userWarehouseCredentials.type) {
+            if (
+                credentials.type === userWarehouseCredentials.credentials.type
+            ) {
                 credentials = {
                     ...credentials,
-                    ...userWarehouseCredentials,
+                    ...userWarehouseCredentials.credentials,
                 } as CreateWarehouseCredentials; // force type as typescript doesn't know the types match
             } else {
                 throw new UnexpectedServerError(
@@ -720,18 +727,10 @@ export class ProjectService {
     }> {
         const sshTunnel = new SshTunnel(data.warehouseConnection);
         await sshTunnel.connect();
-        const useDbtLs =
-            (await postHogClient?.isFeatureEnabled(
-                'use-dbt-ls',
-                user.userUuid,
-                user.organizationUuid !== undefined
-                    ? {
-                          groups: {
-                              organization: user.organizationUuid,
-                          },
-                      }
-                    : {},
-            )) ?? false;
+        const useDbtLs = await isFeatureFlagEnabled(
+            FeatureFlags.UseDbtLs,
+            user,
+        );
         const adapter = await projectAdapterFromConfig(
             data.dbtConnection,
             sshTunnel.overrideCredentials,
@@ -797,20 +796,11 @@ export class ProjectService {
             await this.projectModel.getWarehouseFromCache(projectUuid);
         const sshTunnel = new SshTunnel(project.warehouseConnection);
         await sshTunnel.connect();
-        const useDbtLs =
-            (await postHogClient?.isFeatureEnabled(
-                'use-dbt-ls',
-                user.userUuid,
-                user.organizationUuid !== undefined
-                    ? {
-                          groups: {
-                              organization: user.organizationUuid,
-                          },
-                      }
-                    : {},
-            )) ?? false;
-        console.log(await postHogClient?.getAllFlags(user.userUuid));
-        console.log('projectservice', useDbtLs);
+        const useDbtLs = await isFeatureFlagEnabled(
+            FeatureFlags.UseDbtLs,
+            user,
+        );
+
         const adapter = await projectAdapterFromConfig(
             project.dbtConnection,
             sshTunnel.overrideCredentials,
@@ -1554,6 +1544,19 @@ export class ProjectService {
                         );
                     }
 
+                    const useNewTableCalculationsEngine =
+                        (await postHogClient?.isFeatureEnabled(
+                            'new-table-calculations-engine',
+                            user.userUuid,
+                            user.organizationUuid !== undefined
+                                ? {
+                                      groups: {
+                                          organization: user.organizationUuid,
+                                      },
+                                  }
+                                : {},
+                        )) ?? false;
+
                     const { organizationUuid } =
                         await this.projectModel.getSummary(projectUuid);
 
@@ -1637,19 +1640,19 @@ export class ProjectService {
                                 metricQuery.tableCalculations.filter(
                                     (tableCalculation) =>
                                         tableCalculation.format?.type ===
-                                        TableCalculationFormatType.PERCENT,
+                                        CustomFormatType.PERCENT,
                                 ).length,
                             tableCalculationsCurrencyFormatCount:
                                 metricQuery.tableCalculations.filter(
                                     (tableCalculation) =>
                                         tableCalculation.format?.type ===
-                                        TableCalculationFormatType.CURRENCY,
+                                        CustomFormatType.CURRENCY,
                                 ).length,
                             tableCalculationsNumberFormatCount:
                                 metricQuery.tableCalculations.filter(
                                     (tableCalculation) =>
                                         tableCalculation.format?.type ===
-                                        TableCalculationFormatType.NUMBER,
+                                        CustomFormatType.NUMBER,
                                 ).length,
                             additionalMetricsCount: (
                                 metricQuery.additionalMetrics || []
@@ -1668,6 +1671,39 @@ export class ProjectService {
                                     metric.filters &&
                                     metric.filters.length > 0,
                             ).length,
+                            additionalMetricsPercentFormatCount: (
+                                metricQuery.additionalMetrics || []
+                            ).filter(
+                                (metric) =>
+                                    metricQuery.metrics.includes(
+                                        getFieldId(metric),
+                                    ) &&
+                                    metric.formatOptions &&
+                                    metric.formatOptions.type ===
+                                        CustomFormatType.PERCENT,
+                            ).length,
+                            additionalMetricsCurrencyFormatCount: (
+                                metricQuery.additionalMetrics || []
+                            ).filter(
+                                (metric) =>
+                                    metricQuery.metrics.includes(
+                                        getFieldId(metric),
+                                    ) &&
+                                    metric.formatOptions &&
+                                    metric.formatOptions.type ===
+                                        CustomFormatType.CURRENCY,
+                            ).length,
+                            additionalMetricsNumberFormatCount: (
+                                metricQuery.additionalMetrics || []
+                            ).filter(
+                                (metric) =>
+                                    metricQuery.metrics.includes(
+                                        getFieldId(metric),
+                                    ) &&
+                                    metric.formatOptions &&
+                                    metric.formatOptions.type ===
+                                        CustomFormatType.NUMBER,
+                            ).length,
                             context,
                             ...countCustomDimensionsInMetricQuery(metricQuery),
                             dateZoomGranularity: granularity || null,
@@ -1676,6 +1712,18 @@ export class ProjectService {
 
                     Logger.debug(`Fetch query results from cache or warehouse`);
                     span.setAttribute('generatedSql', query);
+
+                    /**
+                     * If enabled, we include additional attributes for this span allowing us to measure
+                     * the impact of upcoming table calculation handling changes.
+                     */
+                    if (useNewTableCalculationsEngine) {
+                        span.setAttributes({
+                            tableCalculationsNum:
+                                metricQuery.tableCalculations.length,
+                            newTableCalculations: useNewTableCalculationsEngine,
+                        });
+                    }
                     span.setAttribute('lightdash.projectUuid', projectUuid);
                     span.setAttribute(
                         'warehouse.type',
@@ -3336,5 +3384,93 @@ export class ProjectService {
             acc[exposure.name] = exposure;
             return acc;
         }, {});
+    }
+
+    async getProjectCredentialsPreference(
+        user: SessionUser,
+        projectUuid: string,
+    ): Promise<UserWarehouseCredentials | undefined> {
+        const project = await this.projectModel.getSummary(projectUuid);
+        if (user.ability.cannot('view', subject('Project', project))) {
+            throw new ForbiddenError();
+        }
+        const credentials =
+            await this.projectModel.getWarehouseCredentialsForProject(
+                projectUuid,
+            );
+        return this.userWarehouseCredentialsModel.findForProject(
+            project.projectUuid,
+            user.userUuid,
+            credentials.type,
+        );
+    }
+
+    async upsertProjectCredentialsPreference(
+        user: SessionUser,
+        projectUuid: string,
+        userWarehouseCredentialsUuid: string,
+    ) {
+        const userWarehouseCredentials =
+            await this.userWarehouseCredentialsModel.getByUuid(
+                userWarehouseCredentialsUuid,
+            );
+        if (userWarehouseCredentials.userUuid !== user.userUuid) {
+            throw new ForbiddenError();
+        }
+        const project = await this.projectModel.getSummary(projectUuid);
+        if (user.ability.cannot('view', subject('Project', project))) {
+            throw new ForbiddenError();
+        }
+        await this.userWarehouseCredentialsModel.upsertUserCredentialsPreference(
+            user.userUuid,
+            projectUuid,
+            userWarehouseCredentialsUuid,
+        );
+    }
+
+    async getCustomMetrics(
+        user: SessionUser,
+        projectUuid: string,
+    ): Promise<
+        {
+            name: string;
+            label: string;
+            modelName: string;
+            yml: string;
+            chartLabel: string;
+            chartUrl: string;
+        }[]
+    > {
+        // TODO implement permissions
+        const chartSummaries = await this.savedChartModel.find({
+            projectUuid,
+        });
+        const chartPromises = chartSummaries.map((summary) =>
+            this.savedChartModel.get(summary.uuid, undefined),
+        );
+
+        const charts = await Promise.all(chartPromises);
+
+        return charts.reduce<any[]>((acc, chart) => {
+            const customMetrics = chart.metricQuery.additionalMetrics;
+
+            if (customMetrics === undefined || customMetrics.length === 0)
+                return acc;
+            const metrics = [
+                ...acc,
+                ...customMetrics.map((metric) => ({
+                    name: metric.uuid,
+                    label: metric.label,
+                    modelName: metric.table,
+                    yml: yaml.dump(convertCustomMetricToDbt(metric), {
+                        quotingType: "'",
+                    }),
+                    chartLabel: chart.name,
+                    chartUrl: `${lightdashConfig.siteUrl}/projects/${projectUuid}/saved/${chart.uuid}/view`,
+                })),
+            ];
+            console.log('metrics', metrics);
+            return metrics;
+        }, []);
     }
 }

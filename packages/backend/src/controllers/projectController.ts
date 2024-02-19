@@ -13,6 +13,7 @@ import {
     CreateProjectMember,
     DbtExposure,
     UpdateProjectMember,
+    UserWarehouseCredentials,
 } from '@lightdash/common';
 import {
     Body,
@@ -337,6 +338,76 @@ export class ProjectController extends Controller {
         return {
             status: 'ok',
             results: exposures,
+        };
+    }
+
+    @Middlewares([allowApiKeyAuthentication, isAuthenticated])
+    @SuccessResponse('200', 'Success')
+    @Get('{projectUuid}/user-credentials')
+    @OperationId('getUserWarehouseCredentialsPreference')
+    async getUserWarehouseCredentialsPreference(
+        @Path() projectUuid: string,
+        @Request() req: express.Request,
+    ): Promise<{
+        status: 'ok';
+        results: UserWarehouseCredentials | undefined;
+    }> {
+        this.setStatus(200);
+        return {
+            status: 'ok',
+            results: await projectService.getProjectCredentialsPreference(
+                req.user!,
+                projectUuid,
+            ),
+        };
+    }
+
+    @Middlewares([allowApiKeyAuthentication, isAuthenticated])
+    @SuccessResponse('200', 'Success')
+    @Patch('{projectUuid}/user-credentials/{userWarehouseCredentialsUuid}')
+    @OperationId('updateUserWarehouseCredentialsPreference')
+    async updateUserWarehouseCredentialsPreference(
+        @Path() projectUuid: string,
+        @Path() userWarehouseCredentialsUuid: string,
+        @Request() req: express.Request,
+    ): Promise<ApiSuccessEmpty> {
+        this.setStatus(200);
+        await projectService.upsertProjectCredentialsPreference(
+            req.user!,
+            projectUuid,
+            userWarehouseCredentialsUuid,
+        );
+        return {
+            status: 'ok',
+            results: undefined,
+        };
+    }
+
+    @Middlewares([allowApiKeyAuthentication, isAuthenticated])
+    @SuccessResponse('200', 'Success')
+    @Get('{projectUuid}/custom-metrics')
+    @OperationId('getCustomMetrics')
+    async getCustomMetrics(
+        @Path() projectUuid: string,
+        @Request() req: express.Request,
+    ): Promise<{
+        status: 'ok';
+        results: {
+            name: string;
+            label: string;
+            modelName: string;
+            yml: string;
+            chartLabel: string;
+            chartUrl: string;
+        }[];
+    }> {
+        this.setStatus(200);
+        return {
+            status: 'ok',
+            results: await projectService.getCustomMetrics(
+                req.user!,
+                projectUuid,
+            ),
         };
     }
 }

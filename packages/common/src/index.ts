@@ -22,6 +22,7 @@ import {
     isDimension,
     isField,
     isMetric,
+    isTableCalculation,
     ItemsMap,
     Metric,
     TableCalculation,
@@ -60,6 +61,11 @@ import { EmailStatusExpiring } from './types/email';
 import { FieldValueSearchResult } from './types/fieldMatch';
 import { DashboardFilters } from './types/filter';
 import {
+    GitIntegrationConfiguration,
+    GitRepo,
+    PullRequestCreated,
+} from './types/gitIntegration';
+import {
     DeleteOpenIdentity,
     OpenIdIdentitySummary,
 } from './types/openIdIdentity';
@@ -95,6 +101,7 @@ import { Space } from './types/space';
 import { ApiSshKeyPairResponse } from './types/SshKeyPair';
 import { TableBase } from './types/table';
 import { LightdashUser, UserAllowedOrganization } from './types/user';
+import { UserWarehouseCredentials } from './types/userWarehouseCredentials';
 import { ValidationResponse } from './types/validation';
 import { convertAdditionalMetric } from './utils/additionalMetrics';
 import { getFields } from './utils/fields';
@@ -128,10 +135,12 @@ export * from './types/downloadFile';
 export * from './types/email';
 export * from './types/errors';
 export * from './types/explore';
+export * from './types/featureFlags';
 export * from './types/field';
 export * from './types/fieldMatch';
 export * from './types/filter';
 export * from './types/gdrive';
+export * from './types/gitIntegration';
 export * from './types/groups';
 export * from './types/job';
 export * from './types/metricQuery';
@@ -166,6 +175,7 @@ export * from './utils/additionalMetrics';
 export * from './utils/api';
 export { default as assertUnreachable } from './utils/assertUnreachable';
 export * from './utils/conditionalFormatting';
+export * from './utils/convertToDbt';
 export * from './utils/email';
 export * from './utils/fields';
 export * from './utils/filters';
@@ -569,6 +579,10 @@ type ApiResults =
     | ValidationResponse[]
     | ChartHistory
     | ChartVersion
+    | Array<GitRepo>
+    | PullRequestCreated
+    | GitIntegrationConfiguration
+    | UserWarehouseCredentials
     | ApiJobStatusResponse['results']
     | ApiJobScheduledResponse['results']
     | ApiSshKeyPairResponse['results']
@@ -577,9 +591,9 @@ type ApiResults =
     | Record<string, DbtExposure>
     | ApiSuccessEmpty;
 
-export type ApiResponse = {
+export type ApiResponse<T extends ApiResults = ApiResults> = {
     status: 'ok';
-    results: ApiResults;
+    results: T;
 };
 
 type ApiErrorDetail = {
@@ -672,9 +686,11 @@ export type HealthState = {
     };
     customVisualizationsEnabled: boolean;
     hasSlack: boolean;
+    hasGithub: boolean;
     hasHeadlessBrowser: boolean;
     hasDbtSemanticLayer: boolean;
     hasGroups: boolean;
+    hasExtendedUsageAnalytics: boolean;
 };
 
 export enum DBFieldTypes {
@@ -833,6 +849,17 @@ export const getMetricsFromItemsMap = (
     Object.entries(itemsMap).reduce<Record<string, Metric>>(
         (acc, [key, value]) => {
             if (isField(value) && isMetric(value) && filter(value)) {
+                return { ...acc, [key]: value };
+            }
+            return acc;
+        },
+        {},
+    );
+
+export const getTableCalculationsFromItemsMap = (itemsMap?: ItemsMap) =>
+    Object.entries(itemsMap ?? {}).reduce<Record<string, TableCalculation>>(
+        (acc, [key, value]) => {
+            if (isTableCalculation(value)) {
                 return { ...acc, [key]: value };
             }
             return acc;

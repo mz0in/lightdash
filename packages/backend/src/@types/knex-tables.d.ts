@@ -131,6 +131,10 @@ import {
     EmailOneTimePasscodeTable,
 } from '../database/entities/emailOneTimePasscodes';
 import {
+    GithubAppInstallationTable,
+    GithubAppInstallationTableName,
+} from '../database/entities/githubAppInstallation';
+import {
     GroupMembershipTable,
     GroupMembershipTableName,
 } from '../database/entities/groupMemberships';
@@ -168,6 +172,8 @@ import {
     UserAttributesTable,
 } from '../database/entities/userAttributes';
 import {
+    ProjectUserWarehouseCredentialPreferenceTable,
+    ProjectUserWarehouseCredentialPreferenceTableName,
     UserWarehouseCredentialsTable,
     UserWarehouseCredentialsTableName,
 } from '../database/entities/userWarehouseCredentials';
@@ -185,6 +191,7 @@ declare module 'knex/types/tables' {
         [SessionTableName]: SessionTable;
         [WarehouseCredentialTableName]: WarehouseCredentialTable;
         [UserWarehouseCredentialsTableName]: UserWarehouseCredentialsTable;
+        [ProjectUserWarehouseCredentialPreferenceTableName]: ProjectUserWarehouseCredentialPreferenceTable;
         [ProjectTableName]: ProjectTable;
         [SavedChartsTableName]: SavedChartTable;
         [SavedChartVersionsTableName]: SavedChartVersionsTable;
@@ -240,5 +247,6 @@ declare module 'knex/types/tables' {
         [GroupUserAttributesTable]: DbGroupUserAttribute;
         [SavedChartCustomDimensionsTableName]: SavedChartCustomDimensionsTable;
         [DownloadFileTableName]: DownloadFileTable;
+        [GithubAppInstallationTableName]: GithubAppInstallationTable;
     }
 }

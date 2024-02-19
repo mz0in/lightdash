@@ -18,6 +18,7 @@ import { Link, useHistory, useParams } from 'react-router-dom';
 import useDashboardStorage from '../../hooks/dashboard/useDashboardStorage';
 import { useActiveProjectUuid } from '../../hooks/useActiveProject';
 import { useProjects } from '../../hooks/useProjects';
+import { useApp } from '../../providers/AppProvider';
 import Logo from '../../svgs/logo-icon.svg?react';
 import MantineIcon from '../common/MantineIcon';
 import BrowseMenu from './BrowseMenu';
@@ -28,6 +29,7 @@ import HelpMenu from './HelpMenu';
 import { NotificationsMenu } from './NotificationsMenu';
 import ProjectSwitcher from './ProjectSwitcher';
 import SettingsMenu from './SettingsMenu';
+import UserCredentialsSwitcher from './UserCredentialsSwitcher';
 import UserMenu from './UserMenu';
 
 export const NAVBAR_HEIGHT = 50;
@@ -111,6 +113,8 @@ const NavBar = memo(() => {
         clearDashboardStorage,
     } = useDashboardStorage();
 
+    const { isFullscreen } = useApp();
+
     const dashboardInfo = getEditingDashboardInfo();
 
     const homeUrl = activeProjectUuid
@@ -139,21 +143,19 @@ const NavBar = memo(() => {
         );
     }
 
+    const headerContainerHeight =
+        NAVBAR_HEIGHT + (isCurrentProjectPreview ? BANNER_HEIGHT : 0);
+
     return (
         <MantineProvider inherit theme={{ colorScheme: 'dark' }}>
             {isCurrentProjectPreview ? <PreviewBanner /> : null}
             {/* hack to make navbar fixed and maintain space */}
-            <Box
-                h={
-                    NAVBAR_HEIGHT +
-                    (isCurrentProjectPreview ? BANNER_HEIGHT : 0)
-                }
-            />
+            <Box h={!isFullscreen ? headerContainerHeight : 0} />
             <Header
                 height={NAVBAR_HEIGHT}
                 fixed
                 mt={isCurrentProjectPreview ? BANNER_HEIGHT : 'none'}
-                display="flex"
+                display={isFullscreen ? 'none' : 'flex'}
                 px="md"
                 zIndex={getDefaultZIndex('app')}
                 sx={{
@@ -212,7 +214,7 @@ const NavBar = memo(() => {
                     <Divider orientation="vertical" my="xs" color="gray.8" />
 
                     <ProjectSwitcher />
-
+                    <UserCredentialsSwitcher />
                     <UserMenu />
                 </Group>
             </Header>

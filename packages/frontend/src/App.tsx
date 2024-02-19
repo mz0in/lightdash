@@ -1,34 +1,17 @@
 import { Ability } from '@casl/ability';
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Helmet } from 'react-helmet';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { AbilityContext } from './components/common/Authorization';
+import VersionAutoUpdater from './components/VersionAutoUpdater/VersionAutoUpdater';
 import MobileRoutes from './MobileRoutes';
 import { ActiveJobProvider } from './providers/ActiveJobProvider';
 import { AppProvider } from './providers/AppProvider';
-import { ErrorLogsProvider } from './providers/ErrorLogsProvider';
 import MantineProvider from './providers/MantineProvider';
+import ReactQueryProvider from './providers/ReactQueryProvider';
 import ThirdPartyProvider from './providers/ThirdPartyServicesProvider';
 import { TrackingProvider } from './providers/TrackingProvider';
 import Routes from './Routes';
-
-const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            staleTime: 30000, // 30 seconds
-            refetchOnWindowFocus: false,
-            onError: async (result) => {
-                // @ts-ignore
-                const { error: { statusCode } = {} } = result;
-                if (statusCode === 401) {
-                    await queryClient.invalidateQueries(['health']);
-                }
-            },
-        },
-    },
-});
 
 const defaultAbility = new Ability();
 
@@ -47,10 +30,11 @@ const App = () => (
             <title>Lightdash</title>
         </Helmet>
 
-        <QueryClientProvider client={queryClient}>
+        <ReactQueryProvider>
             <MantineProvider>
-                <AppProvider>
-                    <Router>
+                <Router>
+                    <AppProvider>
+                        <VersionAutoUpdater />
                         <ThirdPartyProvider
                             enabled={isMobile || !isMinimalPage}
                         >
@@ -59,23 +43,21 @@ const App = () => (
                             >
                                 <AbilityContext.Provider value={defaultAbility}>
                                     <ActiveJobProvider>
-                                        <ErrorLogsProvider>
-                                            {isMobile ? (
-                                                <MobileRoutes />
-                                            ) : (
-                                                <Routes />
-                                            )}
-                                        </ErrorLogsProvider>
+                                        {isMobile ? (
+                                            <MobileRoutes />
+                                        ) : (
+                                            <Routes />
+                                        )}
                                     </ActiveJobProvider>
                                 </AbilityContext.Provider>
                             </TrackingProvider>
                         </ThirdPartyProvider>
-                    </Router>
-                </AppProvider>
+                    </AppProvider>
+                </Router>
             </MantineProvider>
 
             <ReactQueryDevtools initialIsOpen={false} />
-        </QueryClientProvider>
+        </ReactQueryProvider>
     </>
 );
 

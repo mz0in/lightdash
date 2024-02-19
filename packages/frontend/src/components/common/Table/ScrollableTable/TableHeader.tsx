@@ -1,8 +1,8 @@
+import { Draggable } from '@hello-pangea/dnd';
 import { isField } from '@lightdash/common';
 import { Tooltip } from '@mantine/core';
 import { flexRender } from '@tanstack/react-table';
 import React, { FC } from 'react';
-import { Draggable } from 'react-beautiful-dnd';
 import {
     TABLE_HEADER_BG,
     Th,
@@ -35,6 +35,11 @@ const TableHeader: FC<TableHeaderProps> = ({ minimal = false }) => {
                     <HeaderDroppable headerGroup={headerGroup}>
                         {headerGroup.headers.map((header) => {
                             const meta = header.column.columnDef.meta;
+                            const tooltipLabel =
+                                meta?.item && isField(meta?.item)
+                                    ? meta.item.description
+                                    : undefined;
+
                             return (
                                 <Th
                                     key={header.id}
@@ -78,15 +83,10 @@ const TableHeader: FC<TableHeaderProps> = ({ minimal = false }) => {
                                                         withinPortal
                                                         maw={400}
                                                         multiline
-                                                        label={
-                                                            meta?.item &&
-                                                            isField(meta?.item)
-                                                                ? meta.item
-                                                                      .description
-                                                                : undefined
-                                                        }
+                                                        label={tooltipLabel}
                                                         position="top"
                                                         disabled={
+                                                            !tooltipLabel ||
                                                             minimal ||
                                                             snapshot.isDropAnimating ||
                                                             snapshot.isDragging

@@ -297,9 +297,17 @@ describe('replaceUserAttributes', () => {
         ).toThrowError(ForbiddenError);
     });
 
+    it('method with no user attribute value should throw error', async () => {
+        expect(() =>
+            replaceUserAttributes('${lightdash.attribute.test} > 1', {
+                test: [],
+            }),
+        ).toThrowError(ForbiddenError);
+    });
+
     it('method should replace sqlFilter with user attribute', async () => {
         const userAttributes = { test: ['1'] };
-        const expected = "'1' > 1";
+        const expected = "('1' > 1)";
         expect(
             replaceUserAttributes(
                 '${lightdash.attribute.test} > 1',
@@ -312,11 +320,19 @@ describe('replaceUserAttributes', () => {
         ).toEqual(expected);
     });
 
+    it('method should replace sqlFilter with user attribute with multiple values', async () => {
+        expect(
+            replaceUserAttributes("'1' IN (${lightdash.attribute.test})", {
+                test: ['1', '2'],
+            }),
+        ).toEqual("('1' IN ('1', '2'))");
+    });
+
     it('method should replace sqlFilter with multiple user attributes', async () => {
         const userAttributes = { test: ['1'], another: ['2'] };
         const sqlFilter =
             '${dimension} IS NOT NULL OR (${lightdash.attribute.test} > 1 AND ${lightdash.attribute.another} = 2)';
-        const expected = "${dimension} IS NOT NULL OR ('1' > 1 AND '2' = 2)";
+        const expected = "(${dimension} IS NOT NULL OR ('1' > 1 AND '2' = 2))";
         expect(replaceUserAttributes(sqlFilter, userAttributes)).toEqual(
             expected,
         );
@@ -324,7 +340,7 @@ describe('replaceUserAttributes', () => {
 
     it('method should replace sqlFilter using short aliases', async () => {
         const userAttributes = { test: ['1'], another: ['2'] };
-        const expected = "'1' > 1";
+        const expected = "('1' > 1)";
         expect(
             replaceUserAttributes('${ld.attribute.test} > 1', userAttributes),
         ).toEqual(expected);
